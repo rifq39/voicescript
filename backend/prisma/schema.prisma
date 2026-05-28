@@ -1,0 +1,45 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Reporter {
+  id            Int      @id @default(autoincrement())
+  name          String
+  city          String
+  available     Boolean  @default(true)
+  ratePerMinute Int      @default(2000)
+  jobs          Job[]    @relation("ReporterJobs")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Editor {
+  id        Int      @id @default(autoincrement())
+  name      String
+  available Boolean  @default(true)
+  flatFee   Int      @default(50000)
+  jobs      Job[]    @relation("EditorJobs")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Job {
+  id           Int       @id @default(autoincrement())
+  caseName     String
+  duration     Int
+  locationType String
+  city         String?
+  status       String    @default("NEW")
+  reporterId   Int?
+  editorId     Int?
+  reporter     Reporter? @relation("ReporterJobs", fields: [reporterId], references: [id])
+  editor       Editor?   @relation("EditorJobs", fields: [editorId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}

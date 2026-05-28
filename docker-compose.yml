@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: voicescript_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: voicescript
+      POSTGRES_PASSWORD: voicescript123
+      POSTGRES_DB: voicescript
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voicescript"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    container_name: voicescript_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://voicescript:voicescript123@postgres:5432/voicescript
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: voicescript_frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
