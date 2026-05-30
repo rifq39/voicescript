@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
   title: 'VoiceScript — Court Reporting Workflow',
@@ -7,10 +8,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: 'system-ui, -apple-system, sans-serif', background: '#f8fafc' }}>
-        <header style={{ background: '#1e3a8a', color: '#fff', padding: '16px 32px' }}>
-          <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: -0.5 }}>VoiceScript</div>
-          <div style={{ fontSize: 12, opacity: 0.75 }}>Court Reporting Workflow Manager</div>
+      <body>
+        <header className="bg-blue-900 text-white px-8 py-4">
+          <div className="font-extrabold text-xl tracking-tight">VoiceScript</div>
+          <div className="text-xs text-blue-200 mt-0.5">Court Reporting Workflow Manager</div>
         </header>
         {children}
       </body>

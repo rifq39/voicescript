@@ -1,7 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Job, Reporter, Editor, suggestReporters, getEditors, assignReporter, assignEditor } from '@/lib/api';
+import { Job, Reporter, Editor } from '@/lib/api';
+import { useSuggestReporters, useEditors, useAssignReporter, useAssignEditor } from '@/lib/hooks';
+import { useState } from 'react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface Props {
   job: Job;
@@ -15,69 +21,67 @@ function idr(amount: number) {
 }
 
 export default function AssignModal({ job, mode, onClose, onDone }: Props) {
-  const [reporters, setReporters] = useState<Reporter[]>([]);
-  const [editors, setEditors] = useState<Editor[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (mode === 'reporter') suggestReporters(job.id).then(setReporters);
-    else getEditors().then(setEditors);
-  }, [mode, job.id]);
+  const { data: reporters } = useSuggestReporters(job.id);
+  const { data: editors } = useEditors();
+  const { mutate: doAssignReporter, loading: assigningReporter } = useAssignReporter();
+  const { mutate: doAssignEditor, loading: assigningEditor } = useAssignEditor();
+
+  const loading = assigningReporter || assigningEditor;
+  const list: (Reporter | Editor)[] = mode === 'reporter' ? reporters : editors;
 
   async function handleConfirm() {
     if (!selectedId) return;
-    setLoading(true);
     try {
-      if (mode === 'reporter') await assignReporter(job.id, selectedId);
-      else await assignEditor(job.id, selectedId);
+      if (mode === 'reporter') await doAssignReporter(job.id, selectedId);
+      else await doAssignEditor(job.id, selectedId);
       onDone();
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed';
       alert(msg);
-      setLoading(false);
     }
   }
 
   return (
-    <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
-      onClick={onClose}
-    >
-      <div
-        style={{ background: '#fff', borderRadius: 8, padding: 24, width: 420, maxHeight: '80vh', overflow: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 style={{ margin: '0 0 16px', fontSize: 18 }}>
-          Assign {mode === 'reporter' ? 'Reporter' : 'Editor'} — {job.caseName}
-        </h3>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            Assign {mode === 'reporter' ? 'Reporter' : 'Editor'} — {job.caseName}
+          </DialogTitle>
+        </DialogHeader>
 
-        {mode === 'reporter' && reporters.length === 0 && (
-          <p style={{ color: '#6b7280' }}>No available reporters.</p>
-        )}
-        {mode === 'editor' && editors.length === 0 && (
-          <p style={{ color: '#6b7280' }}>No available editors.</p>
+        {list.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No available {mode === 'reporter' ? 'reporters' : 'editors'}.
+          </p>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="flex flex-col gap-2">
           {mode === 'reporter' &&
-            reporters.map((r, i) => {
+            (reporters as Reporter[]).map((r, i) => {
               const sameCity = job.locationType === 'physical' && job.city?.toLowerCase() === r.city.toLowerCase();
               return (
                 <label
                   key={r.id}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-                    border: `2px solid ${selectedId === r.id ? '#3b82f6' : '#e5e7eb'}`,
-                    borderRadius: 6, cursor: 'pointer',
-                    background: i === 0 && sameCity ? '#eff6ff' : '#fff',
-                  }}
+                  className={cn(
+                    'flex items-center gap-3 rounded-md border-2 px-3 py-2.5 cursor-pointer transition-colors',
+                    selectedId === r.id ? 'border-blue-500 bg-blue-50' : 'border-border hover:border-blue-300',
+                    i === 0 && sameCity && selectedId !== r.id && 'bg-blue-50/50',
+                  )}
                 >
-                  <input type="radio" name="assignee" value={r.id} checked={selectedId === r.id} onChange={() => setSelectedId(r.id)} />
+                  <input
+                    type="radio" name="assignee" value={r.id}
+                    checked={selectedId === r.id} onChange={() => setSelectedId(r.id)}
+                    className="accent-blue-600"
+                  />
                   <div>
-                    <div style={{ fontWeight: 600 }}>{r.name}</div>
-                    <div style={{ fontSize: 13, color: '#6b7280' }}>
-                      {r.city}{sameCity && <span style={{ color: '#3b82f6', fontWeight: 600 }}> · Same city</span>} · {idr(r.ratePerMinute)}/min
+                    <div className="font-semibold text-sm">{r.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {r.city}
+                      {sameCity && <span className="text-blue-600 font-semibold"> · Same city</span>}
+                      {' · '}{idr(r.ratePerMinute)}/min
                     </div>
                   </div>
                 </label>
@@ -85,40 +89,34 @@ export default function AssignModal({ job, mode, onClose, onDone }: Props) {
             })}
 
           {mode === 'editor' &&
-            editors.map((e) => (
+            (editors as Editor[]).map((e) => (
               <label
                 key={e.id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-                  border: `2px solid ${selectedId === e.id ? '#3b82f6' : '#e5e7eb'}`,
-                  borderRadius: 6, cursor: 'pointer',
-                }}
+                className={cn(
+                  'flex items-center gap-3 rounded-md border-2 px-3 py-2.5 cursor-pointer transition-colors',
+                  selectedId === e.id ? 'border-blue-500 bg-blue-50' : 'border-border hover:border-blue-300',
+                )}
               >
-                <input type="radio" name="assignee" value={e.id} checked={selectedId === e.id} onChange={() => setSelectedId(e.id)} />
+                <input
+                  type="radio" name="assignee" value={e.id}
+                  checked={selectedId === e.id} onChange={() => setSelectedId(e.id)}
+                  className="accent-blue-600"
+                />
                 <div>
-                  <div style={{ fontWeight: 600 }}>{e.name}</div>
-                  <div style={{ fontSize: 13, color: '#6b7280' }}>Flat fee: {idr(e.flatFee)}</div>
+                  <div className="font-semibold text-sm">{e.name}</div>
+                  <div className="text-xs text-muted-foreground">Flat fee: {idr(e.flatFee)}</div>
                 </div>
               </label>
             ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
-          <button
-            onClick={onClose}
-            style={{ padding: '8px 16px', border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', cursor: 'pointer' }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={!selectedId || loading}
-            style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: selectedId ? '#3b82f6' : '#93c5fd', color: '#fff', cursor: selectedId ? 'pointer' : 'default', fontWeight: 600 }}
-          >
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleConfirm} disabled={!selectedId || loading}>
             {loading ? 'Assigning…' : 'Confirm'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
