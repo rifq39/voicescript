@@ -1,4 +1,4 @@
-.PHONY: install setup up down build rebuild logs ps seed migrate dev-db
+.PHONY: install setup up down build rebuild logs ps seed migrate dev-db test test-watch
 
 # Install all dependencies locally (backend + frontend)
 install:
@@ -44,3 +44,11 @@ migrate:
 # Start only postgres locally (for local backend/frontend dev with yarn dev)
 dev-db:
 	docker compose up -d postgres
+
+# Run backend unit tests
+test:
+	cd backend && yarn test
+
+# Run backend unit tests in watch mode
+test-watch:
+	cd backend && yarn test:watch
